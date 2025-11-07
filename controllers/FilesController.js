@@ -247,6 +247,132 @@ class FilesController {
       return res.status(401).json({ error: 'Unauthorized' });
     }
   }
+
+  static async putPublish(req, res) {
+    const token = req.headers['x-token'];
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+      const key = `auth_${token}`;
+      const userId = await redisClient.get(key);
+
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const { id } = req.params;
+      if (!id) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+
+      let fileId;
+      try {
+        fileId = ObjectId(id);
+      } catch (error) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+
+      const userIdObj = ObjectId(userId);
+      const db = await dbClient.getDb();
+      const filesCollection = db.collection('files');
+
+      // Check if file exists and belongs to user
+      const file = await filesCollection.findOne({ _id: fileId, userId: userIdObj });
+
+      if (!file) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+
+      // Update isPublic to true
+      await filesCollection.updateOne(
+        { _id: fileId, userId: userIdObj },
+        { $set: { isPublic: true } }
+      );
+
+      // Get updated file
+      const updatedFile = await filesCollection.findOne({ _id: fileId, userId: userIdObj });
+
+      // Format response
+      const response = {
+        id: updatedFile._id.toString(),
+        userId: updatedFile.userId.toString(),
+        name: updatedFile.name,
+        type: updatedFile.type,
+        isPublic: updatedFile.isPublic,
+        parentId: updatedFile.parentId === '0' ? 0 : (updatedFile.parentId.toString ? updatedFile.parentId.toString() : updatedFile.parentId),
+      };
+
+      return res.status(200).json(response);
+    } catch (error) {
+      console.error('Error in putPublish:', error);
+      return res.status(404).json({ error: 'Not found' });
+    }
+  }
+
+  static async putUnpublish(req, res) {
+    const token = req.headers['x-token'];
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+      const key = `auth_${token}`;
+      const userId = await redisClient.get(key);
+
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const { id } = req.params;
+      if (!id) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+
+      let fileId;
+      try {
+        fileId = ObjectId(id);
+      } catch (error) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+
+      const userIdObj = ObjectId(userId);
+      const db = await dbClient.getDb();
+      const filesCollection = db.collection('files');
+
+      // Check if file exists and belongs to user
+      const file = await filesCollection.findOne({ _id: fileId, userId: userIdObj });
+
+      if (!file) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+
+      // Update isPublic to false
+      await filesCollection.updateOne(
+        { _id: fileId, userId: userIdObj },
+        { $set: { isPublic: false } }
+      );
+
+      // Get updated file
+      const updatedFile = await filesCollection.findOne({ _id: fileId, userId: userIdObj });
+
+      // Format response
+      const response = {
+        id: updatedFile._id.toString(),
+        userId: updatedFile.userId.toString(),
+        name: updatedFile.name,
+        type: updatedFile.type,
+        isPublic: updatedFile.isPublic,
+        parentId: updatedFile.parentId === '0' ? 0 : (updatedFile.parentId.toString ? updatedFile.parentId.toString() : updatedFile.parentId),
+      };
+
+      return res.status(200).json(response);
+    } catch (error) {
+      console.error('Error in putUnpublish:', error);
+      return res.status(404).json({ error: 'Not found' });
+    }
+  }
 }
 
 export default FilesController;
