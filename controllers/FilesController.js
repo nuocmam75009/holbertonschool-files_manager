@@ -4,8 +4,8 @@ import fs from 'fs';
 import path from 'path';
 import { promisify } from 'util';
 import mime from 'mime-types';
-import dbClient from '../utils/db.mjs';
-import redisClient from '../utils/redis.mjs';
+import dbClient from '../utils/db';
+import redisClient from '../utils/redis';
 
 const mkdir = promisify(fs.mkdir);
 const writeFile = promisify(fs.writeFile);
@@ -28,7 +28,9 @@ class FilesController {
         return res.status(401).json({ error: 'Unauthorized' });
       }
 
-      const { name, type, parentId = '0', isPublic = false, data } = req.body;
+      const {
+        name, type, parentId = '0', isPublic = false, data,
+      } = req.body;
 
       // Validate name
       if (!name) {
@@ -85,7 +87,7 @@ class FilesController {
         const responseParentId = parentId === '0' ? 0 : parentId;
         return res.status(201).json({
           id: result.insertedId.toString(),
-          userId: userId,
+          userId,
           name,
           type,
           isPublic,
@@ -127,7 +129,7 @@ class FilesController {
       const responseParentId = parentId === '0' ? 0 : parentId;
       return res.status(201).json({
         id: result.insertedId.toString(),
-        userId: userId,
+        userId,
         name,
         type,
         isPublic,
@@ -175,13 +177,22 @@ class FilesController {
       }
 
       // Format response
+      let formattedParentId;
+      if (file.parentId === '0') {
+        formattedParentId = 0;
+      } else if (file.parentId.toString) {
+        formattedParentId = file.parentId.toString();
+      } else {
+        formattedParentId = file.parentId;
+      }
+
       const response = {
         id: file._id.toString(),
         userId: file.userId.toString(),
         name: file.name,
         type: file.type,
         isPublic: file.isPublic,
-        parentId: file.parentId === '0' ? 0 : (file.parentId.toString ? file.parentId.toString() : file.parentId),
+        parentId: formattedParentId,
       };
 
       return res.status(200).json(response);
@@ -235,14 +246,25 @@ class FilesController {
         .toArray();
 
       // Format response
-      const response = files.map((file) => ({
-        id: file._id.toString(),
-        userId: file.userId.toString(),
-        name: file.name,
-        type: file.type,
-        isPublic: file.isPublic,
-        parentId: file.parentId === '0' ? 0 : (file.parentId.toString ? file.parentId.toString() : file.parentId),
-      }));
+      const response = files.map((file) => {
+        let formattedParentId;
+        if (file.parentId === '0') {
+          formattedParentId = 0;
+        } else if (file.parentId.toString) {
+          formattedParentId = file.parentId.toString();
+        } else {
+          formattedParentId = file.parentId;
+        }
+
+        return {
+          id: file._id.toString(),
+          userId: file.userId.toString(),
+          name: file.name,
+          type: file.type,
+          isPublic: file.isPublic,
+          parentId: formattedParentId,
+        };
+      });
 
       return res.status(200).json(response);
     } catch (error) {
@@ -291,20 +313,29 @@ class FilesController {
       // Update isPublic to true
       await filesCollection.updateOne(
         { _id: fileId, userId: userIdObj },
-        { $set: { isPublic: true } }
+        { $set: { isPublic: true } },
       );
 
       // Get updated file
       const updatedFile = await filesCollection.findOne({ _id: fileId, userId: userIdObj });
 
       // Format response
+      let formattedParentId;
+      if (updatedFile.parentId === '0') {
+        formattedParentId = 0;
+      } else if (updatedFile.parentId.toString) {
+        formattedParentId = updatedFile.parentId.toString();
+      } else {
+        formattedParentId = updatedFile.parentId;
+      }
+
       const response = {
         id: updatedFile._id.toString(),
         userId: updatedFile.userId.toString(),
         name: updatedFile.name,
         type: updatedFile.type,
         isPublic: updatedFile.isPublic,
-        parentId: updatedFile.parentId === '0' ? 0 : (updatedFile.parentId.toString ? updatedFile.parentId.toString() : updatedFile.parentId),
+        parentId: formattedParentId,
       };
 
       return res.status(200).json(response);
@@ -354,20 +385,29 @@ class FilesController {
       // Update isPublic to false
       await filesCollection.updateOne(
         { _id: fileId, userId: userIdObj },
-        { $set: { isPublic: false } }
+        { $set: { isPublic: false } },
       );
 
       // Get updated file
       const updatedFile = await filesCollection.findOne({ _id: fileId, userId: userIdObj });
 
       // Format response
+      let formattedParentId;
+      if (updatedFile.parentId === '0') {
+        formattedParentId = 0;
+      } else if (updatedFile.parentId.toString) {
+        formattedParentId = updatedFile.parentId.toString();
+      } else {
+        formattedParentId = updatedFile.parentId;
+      }
+
       const response = {
         id: updatedFile._id.toString(),
         userId: updatedFile.userId.toString(),
         name: updatedFile.name,
         type: updatedFile.type,
         isPublic: updatedFile.isPublic,
-        parentId: updatedFile.parentId === '0' ? 0 : (updatedFile.parentId.toString ? updatedFile.parentId.toString() : updatedFile.parentId),
+        parentId: formattedParentId,
       };
 
       return res.status(200).json(response);
@@ -447,4 +487,3 @@ class FilesController {
 }
 
 export default FilesController;
-
