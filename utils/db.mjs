@@ -50,6 +50,13 @@ class DBClient {
       return 0;
     }
   }
+
+  async getDb() {
+    if (!this.db) {
+      this.db = this.client.db(this.database);
+    }
+    return this.db;
+  }
 }
 
 const dbClient = new DBClient();
