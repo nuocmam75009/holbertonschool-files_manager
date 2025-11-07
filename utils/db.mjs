@@ -22,7 +22,7 @@ class DBClient {
   }
 
   isAlive() {
-    return this.client.topology && this.client.topology.isConnected();
+lint    return this.client.topology && this.client.topology.isConnected();
   }
 
   async nbUsers() {
