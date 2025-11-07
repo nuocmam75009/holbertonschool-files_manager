@@ -3,11 +3,14 @@ import { ObjectId } from 'mongodb';
 import fs from 'fs';
 import path from 'path';
 import { promisify } from 'util';
+import mime from 'mime-types';
 import dbClient from '../utils/db.mjs';
 import redisClient from '../utils/redis.mjs';
 
 const mkdir = promisify(fs.mkdir);
 const writeFile = promisify(fs.writeFile);
+const readFile = promisify(fs.readFile);
+const access = promisify(fs.access);
 
 class FilesController {
   static async postUpload(req, res) {
@@ -370,6 +373,74 @@ class FilesController {
       return res.status(200).json(response);
     } catch (error) {
       console.error('Error in putUnpublish:', error);
+      return res.status(404).json({ error: 'Not found' });
+    }
+  }
+
+  static async getFile(req, res) {
+    try {
+      const { id } = req.params;
+      if (!id) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+
+      let fileId;
+      try {
+        fileId = ObjectId(id);
+      } catch (error) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+
+      const db = await dbClient.getDb();
+      const filesCollection = db.collection('files');
+      const file = await filesCollection.findOne({ _id: fileId });
+
+      if (!file) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+
+      // Check if file is public or user is owner
+      const token = req.headers['x-token'];
+      let userId = null;
+      if (token) {
+        const key = `auth_${token}`;
+        userId = await redisClient.get(key);
+      }
+
+      const isOwner = userId && file.userId.toString() === userId;
+      const isPublic = file.isPublic === true;
+
+      if (!isPublic && !isOwner) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+
+      // Check if file type is folder
+      if (file.type === 'folder') {
+        return res.status(400).json({ error: "A folder doesn't have content" });
+      }
+
+      // Check if file has localPath
+      if (!file.localPath) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+
+      // Check if file exists locally
+      try {
+        await access(file.localPath, fs.constants.F_OK);
+      } catch (error) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+
+      // Get MIME type from filename
+      const mimeType = mime.lookup(file.name) || 'application/octet-stream';
+
+      // Read and return file content
+      const fileContent = await readFile(file.localPath);
+
+      res.setHeader('Content-Type', mimeType);
+      return res.status(200).send(fileContent);
+    } catch (error) {
+      console.error('Error in getFile:', error);
       return res.status(404).json({ error: 'Not found' });
     }
   }
